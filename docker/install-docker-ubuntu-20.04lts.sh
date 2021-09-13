@@ -25,3 +25,4 @@ newgrp docker
 
 docker info
 
+docker info
