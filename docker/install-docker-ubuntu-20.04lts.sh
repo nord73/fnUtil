@@ -21,6 +21,11 @@ sudo apt-get install docker-ce docker-ce-cli containerd.io -y
 
 sudo usermod -aG docker $USER 
 
-newgrp docker
+sudo apt install python3-pip -y
+sudo apt install virtualenv -y
 
-docker info
+virtualenv venv
+source ./venv/bin/activate
+pip install docker-compose
+
+
