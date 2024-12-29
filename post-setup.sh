@@ -126,40 +126,6 @@ configure_ansible_user() {
     fi
 }
 
-configure_wireguard() {
-    log "INFO" "Configuring WireGuard..."
-    apply_setting "installing and configuring WireGuard" "
-        apt install -y wireguard qrencode
-        wg genkey | tee /etc/wireguard/privatekey | wg pubkey > /etc/wireguard/publickey
-        chmod 600 /etc/wireguard/privatekey
-        PRIVATE_KEY=\$(cat /etc/wireguard/privatekey)
-        cat <<EOF > /etc/wireguard/$WIREGUARD_INTERFACE.conf
-[Interface]
-Address = 10.0.0.1/24
-ListenPort = $WIREGUARD_PORT
-PrivateKey = \$PRIVATE_KEY
-SaveConfig = true
-EOF
-        systemctl enable --now wg-quick@$WIREGUARD_INTERFACE
-    "
-}
-
-configure_tailscale() {
-    log "INFO" "Configuring Tailscale..."
-    apply_setting "installing and configuring Tailscale" "
-        curl -fsSL https://tailscale.com/install.sh | sh
-        systemctl enable --now tailscaled
-        tailscale up --authkey $TAILSCALE_AUTH_KEY --hostname $TAILSCALE_HOSTNAME --advertise-routes $TAILSCALE_ADVERTISE_ROUTES
-    "
-}
-
-configure_common_tools() {
-    log "INFO" "Installing common tools..."
-    apply_setting "common tools installation" "
-        apt install -y $COMMON_TOOLS
-    "
-}
-
 configure_firewall() {
     log "INFO" "Configuring firewall..."
     apply_setting "setting up UFW firewall" "
@@ -212,28 +178,69 @@ configure_docker() {
     "
 }
 
-# Prompt for interactive mode
-INTERACTIVE=$(ask "Run in interactive mode?" "yes")
-if [[ "$INTERACTIVE" =~ ^[Yy](es)?$ ]]; then
-    INTERACTIVE=true
-else
-    INTERACTIVE=false
-fi
+configure_wireguard() {
+    log "INFO" "Configuring WireGuard..."
+    apply_setting "installing and configuring WireGuard" "
+        apt install -y wireguard qrencode
+        wg genkey | tee /etc/wireguard/privatekey | wg pubkey > /etc/wireguard/publickey
+        chmod 600 /etc/wireguard/privatekey
+        PRIVATE_KEY=\$(cat /etc/wireguard/privatekey)
+        cat <<EOF > /etc/wireguard/$WIREGUARD_INTERFACE.conf
+[Interface]
+Address = 10.0.0.1/24
+ListenPort = $WIREGUARD_PORT
+PrivateKey = \$PRIVATE_KEY
+SaveConfig = true
+EOF
+        systemctl enable --now wg-quick@$WIREGUARD_INTERFACE
+    "
+}
 
-# Apply configurations
+configure_tailscale() {
+    log "INFO" "Configuring Tailscale..."
+    apply_setting "installing and configuring Tailscale" "
+        curl -fsSL https://tailscale.com/install.sh | sh
+        systemctl enable --now tailscaled
+        tailscale up --authkey $TAILSCALE_AUTH_KEY --hostname $TAILSCALE_HOSTNAME --advertise-routes $TAILSCALE_ADVERTISE_ROUTES
+    "
+}
+
+configure_common_tools() {
+    log "INFO" "Installing common tools..."
+    apply_setting "common tools installation" "
+        apt install -y $COMMON_TOOLS
+    "
+}
+
+# Map optional configurations to their functions
+declare -A OPTIONAL_FUNCTIONS=(
+    ["ENABLE_ANSIBLE_USER"]="configure_ansible_user"
+    ["INSTALL_COMMON_TOOLS"]="configure_common_tools"
+    ["ENABLE_FIREWALL"]="configure_firewall"
+    ["ENABLE_FAIL2BAN"]="configure_fail2ban"
+    ["HARDEN_SSH"]="configure_ssh_hardening"
+    ["INSTALL_DOCKER"]="configure_docker"
+    ["ENABLE_WIREGUARD"]="configure_wireguard"
+    ["ENABLE_TAILSCALE"]="configure_tailscale"
+)
+
+# Apply standard configurations
 log "INFO" "Applying standard configurations..."
 for CONFIG in "${STANDARD_CONFIGS[@]}"; do
     eval "$CONFIG" || error_exit "Failed to apply standard configuration: $CONFIG"
 done
 
+# Apply optional configurations dynamically
 log "INFO" "Processing optional configurations..."
 for CONFIG in "${OPTIONAL_CONFIGS[@]}"; do
-    eval "$CONFIG" || log "INFO" "Failed to apply optional configuration: $CONFIG"
-done
-
-log "INFO" "Skipping disabled configurations..."
-for CONFIG in "${DISABLED_CONFIGS[@]}"; do
-    log "INFO" "Disabled: $CONFIG"
+    eval "$CONFIG"
+    KEY=${CONFIG%%=*} VALUE=${CONFIG##*=}
+    if [[ "$VALUE" == true && -n "${OPTIONAL_FUNCTIONS[$KEY]}" ]]; then
+        log "INFO" "Executing function for $KEY"
+        ${OPTIONAL_FUNCTIONS[$KEY]}
+    else
+        log "DEBUG" "Skipping $KEY (value: $VALUE)"
+    fi
 done
 
 log "INFO" "Post-setup script completed successfully."
