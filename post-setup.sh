@@ -2,7 +2,7 @@
 set -e
 
 # Load configuration
-CONFIG_FILE="./config.cfg"
+CONFIG_FILE="./post-setup.cfg"
 if [[ -f $CONFIG_FILE ]]; then
     # Parse configuration file
     STANDARD_CONFIGS=$(grep "^STANDARD " "$CONFIG_FILE" | sed 's/^STANDARD //')
