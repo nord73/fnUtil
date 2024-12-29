@@ -126,6 +126,40 @@ configure_ansible_user() {
     fi
 }
 
+configure_wireguard() {
+    log "INFO" "Configuring WireGuard..."
+    apply_setting "installing and configuring WireGuard" "
+        apt install -y wireguard qrencode
+        wg genkey | tee /etc/wireguard/privatekey | wg pubkey > /etc/wireguard/publickey
+        chmod 600 /etc/wireguard/privatekey
+        PRIVATE_KEY=\$(cat /etc/wireguard/privatekey)
+        cat <<EOF > /etc/wireguard/$WIREGUARD_INTERFACE.conf
+[Interface]
+Address = 10.0.0.1/24
+ListenPort = $WIREGUARD_PORT
+PrivateKey = \$PRIVATE_KEY
+SaveConfig = true
+EOF
+        systemctl enable --now wg-quick@$WIREGUARD_INTERFACE
+    "
+}
+
+configure_tailscale() {
+    log "INFO" "Configuring Tailscale..."
+    apply_setting "installing and configuring Tailscale" "
+        curl -fsSL https://tailscale.com/install.sh | sh
+        systemctl enable --now tailscaled
+        tailscale up --authkey $TAILSCALE_AUTH_KEY --hostname $TAILSCALE_HOSTNAME --advertise-routes $TAILSCALE_ADVERTISE_ROUTES
+    "
+}
+
+configure_common_tools() {
+    log "INFO" "Installing common tools..."
+    apply_setting "common tools installation" "
+        apt install -y $COMMON_TOOLS
+    "
+}
+
 configure_firewall() {
     log "INFO" "Configuring firewall..."
     apply_setting "setting up UFW firewall" "
