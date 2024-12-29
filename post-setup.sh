@@ -88,7 +88,7 @@ configure_ansible_user() {
     apply_setting "creating Ansible user" "
         adduser --disabled-password --gecos '' $ANSIBLE_ACCOUNT_NAME
         mkdir -p /home/$ANSIBLE_ACCOUNT_NAME/.ssh
-        curl -s https://github.com/$ANSIBLE_GITHUB_USERNAME.keys -o /home/$ANSIBLE_ACCOUNT_NAME/.ssh/authorized_keys
+        echo \"$ANSIBLE_PUBLIC_KEY\" > /home/$ANSIBLE_ACCOUNT_NAME/.ssh/authorized_keys
         chmod 700 /home/$ANSIBLE_ACCOUNT_NAME/.ssh
         chmod 600 /home/$ANSIBLE_ACCOUNT_NAME/.ssh/authorized_keys
         chown -R $ANSIBLE_ACCOUNT_NAME:$ANSIBLE_ACCOUNT_NAME /home/$ANSIBLE_ACCOUNT_NAME/.ssh
@@ -108,6 +108,9 @@ configure_ansible_user() {
         "
     fi
 }
+
+
+
 
 configure_wireguard() {
     log "INFO" "Configuring WireGuard..."
